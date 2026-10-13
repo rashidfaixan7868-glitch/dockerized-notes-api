@@ -42,16 +42,59 @@ app.get('/', (req, res) => {
 });
 
 app.get('/notes', async (req, res) => {
-  const [rows] = await pool.query('SELECT * FROM notes ORDER BY created_at DESC');
-  res.json(rows);
+  try {
+    const [rows] = await pool.query('SELECT * FROM notes ORDER BY created_at DESC');
+    res.json(rows);
+  }catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'something went wrong' });
+  }
 });
 
 app.post('/notes', async (req, res) => {
-  const { message } = req.body;
-  if (!message) return res.status(400).json({ error: 'message is required' });
+  try {
+    const { message } = req.body;
+      if (!message) return res.status(400).json({ error: 'message is required' });
+      if (message.length > 255) return res.status(400).json({ error: 'message too long (max 255 characters)' });
 
-  const [result] = await pool.query('INSERT INTO notes (message) VALUES (?)', [message]);
-  res.status(201).json({ id: result.insertId, message });
+    const [result] = await pool.query('INSERT INTO notes (message) VALUES (?)', [message]);
+    res.status(201).json({ id: result.insertId, message });
+  }catch (err){
+    console.error(err);
+    res.status(500).json({ error: 'something went wrong' });
+  }
+});
+
+app.delete('/notes/:id', async(req,res) => {
+  try {
+    const { id } = req.params;
+    const [ result ] = await pool.query ('DELETE FROM notes WHERE id = ?' , [id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json ({ error: 'notes not found' });
+    }
+    res.json({ message: 'notes deleted' });
+  }catch (err){
+    console.error(err);
+    res.status(500).json({error: 'something went wrong' });
+  }
+});
+
+app.put ('/notes/:id', async(req,res)=>{
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: 'message is required' });
+    const [ result ] = await pool.query('UPDATE notes SET message = ? WHERE id = ?',[message, id]);
+
+    if (result.affectedRows === 0 ){
+      return res.status(404).json({ error: 'notes not found' });
+    }
+    res.status(200).json({message,id});
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'something went wrong' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
